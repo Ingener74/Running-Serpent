@@ -1,0 +1,120 @@
+{
+  "is_server": false,
+  "is_client": true,
+  "commands": [
+    {
+      "name": "Start",
+      "c2s_fields": [
+        {
+          "name": "Credits",
+          "type": "int32",
+          "default": 0
+        },
+        {
+          "name": "NumberOfBalls",
+          "type": "int8",
+          "default": 0
+        },
+        {
+          "name": "GameName",
+          "type": "string",
+          "default": "\"Game57\""
+        },
+        {
+          "name": "State",
+          "type": "commands",
+          "default": 100,
+          "commands": [
+            {
+              "name": "State100",
+              "type": "command",
+              "value": 100,
+              "c2s_fields": [
+                {
+                  "name": "Foo",
+                  "type": "string",
+                  "default": "\"Foo42\""
+                }
+              ]
+            },
+            {
+              "name": "State101",
+              "type": "command",
+              "value": 101,
+              "c2s_fields": [
+                {
+                  "name": "Bar",
+                  "type": "uint64",
+                  "default": 42
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Test",
+          "type": "int8",
+          "default": -3
+        }
+      ],
+      "s2c_fields": [
+        {
+          "name": "Credits",
+          "type": "uint64",
+          "default": 0
+        },
+        {
+          "name": "State",
+          "type": "commands",
+          "default": 10,
+          "commands": [
+            {
+              "name": "SerState10",
+              "type": "command",
+              "value": 10,
+              "s2c_fields": [
+                {
+                  "name": "Barmaley",
+                  "type": "uint64",
+                  "default": 234
+                },
+                {
+                  "name": "Animal",
+                  "type": "string",
+                  "default": "\"Dog\""
+                }
+              ]
+            },
+            {
+              "name": "SerState20",
+              "type": "command",
+              "value": 20,
+              "s2c_fields": [
+                {
+                  "name": "Card",
+                  "type": "string",
+                  "default": "\"qol4k21;3l452;3l4kj5;2l3k4j\""
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pi",
+          "type": "float64",
+          "default": 3.1415926
+        }
+      ]
+    },
+    {
+      "name": "Free",
+      "c2s_fields": [
+        {
+          "name": "Ball",
+          "type": "uint8",
+          "default": 0
+        }
+      ]
+    }
+  ]
+}

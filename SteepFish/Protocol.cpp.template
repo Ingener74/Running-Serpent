@@ -1,0 +1,204 @@
+
+#pragma once
+
+#include "CommandBuffer.h"
+
+{%- macro get_type_simple(typename, complex = 'no complex') -%}
+	{%- if typename == 'int8'    -%} int8_t
+	{%- elif typename == 'int16'   -%} int16_t
+	{%- elif typename == 'int32'   -%} int32_t
+	{%- elif typename == 'int64'   -%} int64_t
+	{%- elif typename == 'uint8'   -%} uint8_t
+	{%- elif typename == 'uint16'  -%} uint16_t
+	{%- elif typename == 'uint32'  -%} uint32_t
+	{%- elif typename == 'uint64'  -%} uint64_t
+	{%- elif typename == 'float32' -%} float
+	{%- elif typename == 'float64' -%} double
+	{%- elif typename == 'string'  -%} std::string
+	{%- elif typename == 'commands' -%} uint8_t
+	{%- elif typename == 'command' -%} {{complex}}
+	{%- else                       -%} bad type
+	{%- endif                      -%}
+{%- endmacro -%}
+
+{%- macro get_type_arg(typename, complex = 'no complex') -%}
+	{%- if typename == 'int8'    -%} int8_t
+	{%- elif typename == 'int16'   -%} int16_t
+	{%- elif typename == 'int32'   -%} int32_t
+	{%- elif typename == 'int64'   -%} int64_t
+	{%- elif typename == 'uint8'   -%} uint8_t
+	{%- elif typename == 'uint16'  -%} uint16_t
+	{%- elif typename == 'uint32'  -%} uint32_t
+	{%- elif typename == 'uint64'  -%} uint64_t
+	{%- elif typename == 'float32' -%} float
+	{%- elif typename == 'float64' -%} double
+	{%- elif typename == 'string'  -%} const std::string&
+	{%- elif typename == 'commands' -%} uint8_t
+	{%- elif typename == 'command' -%} const {{complex}}&
+	{%- else                       -%} bad type
+	{%- endif                      -%}
+{%- endmacro -%}
+
+{%- macro get_type_size(typename, var) -%}
+	{%- if typename == 'int8'    -%} sizeof(m_{{var}})
+	{%- elif typename == 'int16'   -%} sizeof(m_{{var}})
+	{%- elif typename == 'int32'   -%} sizeof(m_{{var}})
+	{%- elif typename == 'int64'   -%} sizeof(m_{{var}})
+	{%- elif typename == 'uint8'   -%} sizeof(m_{{var}})
+	{%- elif typename == 'uint16'  -%} sizeof(m_{{var}})
+	{%- elif typename == 'uint32'  -%} sizeof(m_{{var}})
+	{%- elif typename == 'uint64'  -%} sizeof(m_{{var}})
+	{%- elif typename == 'float32' -%} sizeof(m_{{var}})
+	{%- elif typename == 'float64' -%} sizeof(m_{{var}})
+	{%- elif typename == 'string'  -%} 1 + m_{{var}}.size()
+	{%- elif typename == 'commands' -%} sizeof(m_{{var}})
+	{%- elif typename == 'command' -%} m_{{var}}.size()
+	{%- else                       -%} bad type
+	{%- endif                      -%}
+{%- endmacro -%}
+
+{% macro create_commands(commands) %}
+{% for command in commands %}
+class {{command.name}}Request : public CommandBuffer {
+public:
+	{{command.name}}Request() {
+	}
+	virtual ~{{command.name}}Request() {
+	}
+
+	{% if is_client %}
+
+	{% for field in command.c2s_fields %}
+	{% if field.commands %}
+		{{create_commands(field.commands)}}
+	{% endif %}
+	{%- endfor %}
+
+	{% for field in command.c2s_fields %}
+	{% if field.commands %}
+	{{command.name}}Request& put{{field.name}}({{get_type_arg(field.type, field.name)}} {{field.name}}) {
+		m_{{field.name}} = {{field.name}};
+		return *this;
+	}
+	{% for in_command in field.commands %}
+	{{command.name}}Request& put{{in_command.name}}({{get_type_arg(in_command.type, in_command.name + 'Request')}} {{in_command.name}}) {
+		m_{{in_command.name}} = {{in_command.name}};
+		return *this;
+	}
+	{% endfor %}
+	{% else %}
+	{{command.name}}Request& put{{field.name}}({{get_type_arg(field.type, field.name)}} {{field.name}}) {
+		m_{{field.name}} = {{field.name}};
+		return *this;
+	}
+	{% endif %}
+	{%- endfor %}
+
+    virtual size_t size() const {
+    	return
+    	{%- if command.c2s_fields %}
+			{%- for field in command.c2s_fields %}
+				{%- if field.commands %}
+			{{get_type_size(field.type, field.name)}} + 
+		(
+					{%- for in_command in field.commands %}
+		m_{{field.name}} == {{in_command.value}} ? {{get_type_size(in_command.type, in_command.name)}} :
+						{%- if loop.last %}
+			throw std::runtime_error("")
+						{%- endif -%}
+					{%- endfor -%})	
+			{% if loop.last %}{% else %}+{% endif %}
+				{% else %}
+		{{get_type_size(field.type, field.name)}} {% if loop.last %}{% else %}+{% endif %}
+				{%- endif -%}
+			{%- endfor -%}
+		{% else %}
+    		0
+    	{%- endif -%}
+    	;
+    }
+
+	virtual std::vector<uint8_t> getBuffer() override {
+		setSize(
+			size()
+		);
+
+		{%- for field in command.c2s_fields %}
+			{%- if field.commands %}
+		put(m_{{field.name}});
+				{%- for in_command in field.commands %}
+		m_{{field.name}} == {{in_command.value}} ? put(static_cast<CommandBuffer&>(m_{{in_command.name}})) :
+					{%- if loop.last %} 
+			throw std::runtime_error(""); 
+					{%- endif -%}
+				{%- endfor -%}
+			{% else %}
+		put(m_{{field.name}});
+			{%- endif %}
+		{%- endfor %}
+		return _buffer;
+	}
+
+private:
+	// Client to Server fields
+	{%- for field in command.c2s_fields %}
+		{%- if field.commands %}
+	{{get_type_simple(field.type, field.name) }} m_{{field.name}} = {{field.default}};
+			{%- for in_command in field.commands %}
+	{{get_type_simple(in_command.type, in_command.name + "Request") }} m_{{in_command.name}};
+			{%- endfor -%}
+		{% else %}
+	{{get_type_simple(field.type, field.name) }} m_{{field.name}} = {{field.default}};
+		{% endif -%}
+	{%- endfor -%}
+
+	{% endif %}
+};
+
+class {{command.name}}Response : public CommandBuffer {
+public:
+
+	{% for field in command.s2c_fields %}
+	{% if field.commands %}
+		{{create_commands(field.commands)}}
+	{% endif %}
+	{%- endfor %}
+
+	{{command.name}}Response(const std::vector<uint8_t>& buffer = {}): CommandBuffer(buffer) {
+		if(buffer.empty())
+			return;
+		{%- for field in command.s2c_fields %}
+			{%- if field.commands %}
+		get(m_{{field.name}});
+				{%- for in_command in field.commands %}
+		m_{{field.name}} == {{in_command.value}} ? get(static_cast<CommandBuffer&>(m_{{in_command.name}})) :
+					{%- if loop.last %} 
+			throw std::runtime_error(""); 
+					{%- endif -%}
+				{%- endfor -%}
+			{% else %}
+		get(m_{{field.name}});
+			{%- endif -%}
+		{%- endfor -%}
+	}
+	virtual ~{{command.name}}Response() {
+	}
+
+	{% if is_client %}
+	// Server to Client fields
+		{%- for field in command.s2c_fields %}
+			{%- if field.commands %}
+	{{get_type_simple(field.type)}} m_{{field.name}} = {{field.default}};
+				{%- for in_command in field.commands %}
+	{{get_type_simple(in_command.type, in_command.name + "Response") }} m_{{in_command.name}};
+				{%- endfor -%}
+			{% else %}
+	{{get_type_simple(field.type)}} m_{{field.name}} = {{field.default}};
+			{%- endif -%}
+		{%- endfor -%}
+	{% endif %}
+};
+{% endfor %}
+{% endmacro %}
+
+{{ create_commands(commands) }}
