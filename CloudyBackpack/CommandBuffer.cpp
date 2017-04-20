@@ -1,5 +1,6 @@
 #include <cstring>
 #include <string>
+#include <sstream>
 #include "CommandBuffer.h"
 
 using namespace std;
@@ -44,5 +45,16 @@ void CommandBuffer::get(void *data, size_t size) {
 
 size_t CommandBuffer::size() const {
     return _buffer.size();
+}
+
+std::string CommandBuffer::hexView(const std::vector<uint8_t> &data, size_t offset, size_t size) {
+    std::stringstream ss;
+    uint8_t *ptr = const_cast<uint8_t *>(data.data()) + offset;
+    for (int i = 0; i < size; ++i, ++ptr) {
+        char buffer[8];
+        snprintf(buffer, sizeof(buffer), "%02x ", *ptr);
+        ss << buffer;
+    }
+    return ss.str();
 }
 

@@ -116,5 +116,13 @@
         }
       ]
     }
+  ],
+  "tests": [
+    {
+      "side": "client",
+      "command": "Start",
+      "arg": [1000, 4, "TestName", 100, ["Foo"], -3],
+      "ret": [1024, 10, [30000, "Cat"], 3.24]
+    }
   ]
 }

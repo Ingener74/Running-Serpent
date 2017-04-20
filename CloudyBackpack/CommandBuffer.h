@@ -36,6 +36,8 @@ public:
         get(&t, sizeof(t));
     }
 
+    std::string hexView(const std::vector<uint8_t>& data, size_t offset, size_t size);
+
 protected:
     std::vector<uint8_t> _buffer;
     uint8_t *_ptr = nullptr;
