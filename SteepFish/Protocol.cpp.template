@@ -52,13 +52,12 @@
 	{%- endif                           -%}
 {%- endmacro -%}
 
-{%- macro create_request(command, fields, suffix) -%}
+{%- macro create_request(command, fields, suffix, is_server, is_client) -%}
 {%- for field in fields %}
 	{%- if field.commands %}
-{{create_commands(field.commands)}}
+{{create_commands(field.commands, is_server, is_client)}}
 	{%- endif %}
 {%- endfor %}
-
 class {{command.name}}{{suffix}} : public CommandBuffer {
 public:
 	{{command.name}}{{suffix}}() {
@@ -66,24 +65,24 @@ public:
 	virtual ~{{command.name}}{{suffix}}() {
 	}
 
-	{% for field in fields -%}
-		{% if field.commands %}
+	{%- for field in fields %}
+		{%- if field.commands %}
 	{{command.name}}{{suffix}}& put{{field.name}}({{get_type_arg(field.type, field.name)}} {{field.name}}) {
 		m_{{field.name}} = {{field.name}};
 		return *this;
 	}
-			{% for in_command in field.commands %}
+			{%- for in_command in field.commands %}
 	{{command.name}}{{suffix}}& put{{in_command.name}}({{get_type_arg(in_command.type, in_command.name + suffix)}} {{in_command.name}}) {
 		m_{{in_command.name}} = {{in_command.name}};
 		return *this;
 	}
-			{% endfor %}
-		{% else %}
+			{%- endfor %}
+		{%- else %}
 	{{command.name}}{{suffix}}& put{{field.name}}({{get_type_arg(field.type, field.name)}} {{field.name}}) {
 		m_{{field.name}} = {{field.name}};
 		return *this;
 	}
-		{% endif %}
+		{%- endif %}
 	{%- endfor %}
 
     virtual size_t size() const {
@@ -129,10 +128,10 @@ public:
 	}
 
 	friend std::ostream& operator<<(std::ostream& out, const {{command.name}}{{suffix}}& rhs) {
-		return out
+		return out << std::endl
 		{%- for field in fields %}
 			{%- if field.commands %}
-			<< "{{field.name}} = " << rhs.m_{{field.name}} << ", "
+			<< "{{field.name}} = " << rhs.m_{{field.name}} << std::endl
 			<< (
 				{%- for in_command in field.commands %}
 				rhs.m_{{field.name}} == {{in_command.value}} ? "{{in_command.name}}" :
@@ -148,9 +147,9 @@ public:
 					throw std::runtime_error("invalid command value")
 					{%- endif -%}
 				{%- endfor %}
-			) #}
+			) #} << std::endl
 			{%- else %}
-			<< "{{field.name}} = " << rhs.m_{{field.name}} << ", "
+			<< "{{field.name}} = " << rhs.m_{{field.name}} << std::endl
 			{%- endif %}
 		{%- endfor %}
 		;
@@ -168,22 +167,26 @@ private:
 		{%- endif %}
 	{%- endfor %}
 };
-
 {%- endmacro -%}
 
-{%- macro create_response(command, fields, suffix) %}
-
+{%- macro create_response(command, fields, suffix, is_server, is_client) %}
 	{%- for field in fields %}
 		{%- if field.commands %}
-{{create_commands(field.commands)}}
+{{create_commands(field.commands, is_server, is_client)}}
 		{%- endif %}
 	{%- endfor %}
-
 class {{command.name}}{{suffix}} : public CommandBuffer {
 public:
 	{{command.name}}{{suffix}}(const std::vector<uint8_t>& buffer = {}): CommandBuffer(buffer) {
-		if(buffer.empty())
+		parse(buffer);
+	}
+	virtual ~{{command.name}}{{suffix}}() {
+	}
+
+    virtual void parse(const std::vector<uint8_t>& data){
+		if(data.empty())
 			return;
+		CommandBuffer::parse(data);
 		{%- for field in fields %}
 			{%- if field.commands %}
 		get(m_{{field.name}});
@@ -197,8 +200,34 @@ public:
 		get(m_{{field.name}});
 			{%- endif -%}
 		{%- endfor %}
-	}
-	virtual ~{{command.name}}{{suffix}}() {
+    }
+
+	friend std::ostream& operator<<(std::ostream& out, const {{command.name}}{{suffix}}& rhs) {
+		return out << std::endl
+		{%- for field in fields %}
+			{%- if field.commands %}
+			<< "{{field.name}} = " << rhs.m_{{field.name}} << std::endl
+			<< (
+				{%- for in_command in field.commands %}
+				rhs.m_{{field.name}} == {{in_command.value}} ? "{{in_command.name}}" :
+					{%- if loop.last %} 
+					throw std::runtime_error("invalid command value")
+					{%- endif -%}
+				{%- endfor %}
+			) {# << 
+			(
+				{%- for in_command in field.commands %}
+				rhs.m_{{field.name}} == {{in_command.value}} ? static_cast<CommandBuffer&>(const_cast<{{in_command.name + suffix}}&>(rhs.m_{{in_command.name}})) :
+					{%- if loop.last %} 
+					throw std::runtime_error("invalid command value")
+					{%- endif -%}
+				{%- endfor %}
+			) #} << std::endl
+			{%- else %}
+			<< "{{field.name}} = " << rhs.m_{{field.name}} << std::endl
+			{%- endif %}
+		{%- endfor %}
+		;
 	}
 
 	{%- for field in fields %}
@@ -214,11 +243,17 @@ public:
 };
 {%- endmacro -%}
 
-{%- macro create_commands(commands) %}
+{%- macro create_commands(commands, is_server, is_client) %}
 	{%- for command in commands %}
-{{create_request(command, command.c2s_fields, 'ServerRequest')}}
-{{create_response(command, command.s2c_fields, 'ServerResponse')}}
+		{%- if is_client %}
+{{create_request(command, command.c2s_fields, 'ServerRequest', false, is_client)}}
+{{create_response(command, command.s2c_fields, 'ServerResponse', false, is_client)}}
+		{%- endif %}
+		{%- if is_server %}
+{{create_request(command, command.s2c_fields, 'ClientRequest', is_server, false)}}
+{{create_response(command, command.c2s_fields, 'ClientResponse', is_server, false)}}
+		{%- endif %}
 	{% endfor %}
 {% endmacro -%}
 
-{{ create_commands(commands) }}
+{{ create_commands(commands, is_server, is_client) }}

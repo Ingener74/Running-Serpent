@@ -36,6 +36,16 @@ public:
         get(&t, sizeof(t));
     }
 
+    void get(std::string& t);
+
+    void get(std::vector<uint8_t> &t);
+
+    void get(CommandBuffer& t);
+
+    void setData(const std::vector<uint8_t>& data);
+
+    virtual void parse(const std::vector<uint8_t>& data);
+
     std::string hexView(const std::vector<uint8_t>& data, size_t offset, size_t size);
 
 protected:

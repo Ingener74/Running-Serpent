@@ -1,5 +1,5 @@
 {
-  "is_server": false,
+  "is_server": true,
   "is_client": true,
   "commands": [
     {

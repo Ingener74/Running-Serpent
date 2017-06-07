@@ -4,8 +4,6 @@
 using namespace std;
 
 int main() {
-    cout << "Hello, World!" << endl;
-
     try {
         auto startServerRequest = StartServerRequest().
                 putCredits(10000).
@@ -14,16 +12,19 @@ int main() {
                 putState(100).
                 putState100(State100ServerRequest().putFoo("Quuuz")).
                 putState101(State101ServerRequest().putBar(43));
+        cout << "Start Server Request" << startServerRequest << endl;
 
-        auto buffer = startServerRequest.getBuffer();
+        auto startClientResponse = StartClientResponse(startServerRequest.getBuffer());
+        cout << "Start Server Response" << startClientResponse << endl;
 
-        cout << "Start Server Request " << endl << startServerRequest << endl;
+        auto freeServerRequest = FreeServerRequest().
+                putBall(8);
+        cout << "Free Server Request" << freeServerRequest << endl;
 
-        StartServerResponse sr;
+        auto freeClientResponse = FreeClientResponse(freeServerRequest.getBuffer());
+        cout << "Free Client Response" << freeClientResponse << endl;
 
-        auto freeBuffer = FreeServerRequest().
-                putBall(8).
-                getBuffer();
+        cout << endl;
 
     } catch (const exception &e) {
         cerr << e.what() << endl;
